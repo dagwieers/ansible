@@ -68,10 +68,12 @@ def main():
         )
     )
 
-    if module.params['fail'] in BOOLEANS_TRUE and module.params['rc'] == 0:
+    fail = module.boolean(module.params.get('fail', False))
+
+    if fail and module.params['rc'] == 0:
         module.params['rc'] = 1
 
-    if module.params['fail'] in BOOLEANS_TRUE:
+    if fail:
         module.fail_json(rc=module.params['rc'], msg=module.params['msg'])
     else:
         module.exit_json(msg=module.params['msg'])
