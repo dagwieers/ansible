@@ -96,7 +96,7 @@ class Connection(object):
 
         return ssh
 
-    def exec_command(self, cmd, tmp_path, sudo_user, sudoable=False, executable='/bin/sh'):
+    def exec_command(self, cmd, tmp_path, sudo_user, sudoable=False, executable='/bin/sh', pty=False):
         ''' run a command on the remote host '''
 
         bufsize = 4096
@@ -107,13 +107,16 @@ class Connection(object):
             if len(str(e)) > 0:
                 msg += ": %s" % str(e)
             raise errors.AnsibleConnectionFailed(msg)
-        chan.get_pty()
+
 
         if not self.runner.sudo or not sudoable:
+            if pty:
+                chan.get_pty()
             quoted_command = executable + ' -c ' + pipes.quote(cmd)
             vvv("EXEC %s" % quoted_command, host=self.host)
             chan.exec_command(quoted_command)
         else:
+            chan.get_pty()
             # Rather than detect if sudo wants a password this time, -k makes
             # sudo always ask for a password if one is required. 
             # Passing a quoted compound command to sudo (or sudo -s)

@@ -37,7 +37,7 @@ class Connection(object):
 
         return self
 
-    def exec_command(self, cmd, tmp_path, sudo_user, sudoable=False, executable='/bin/sh'):
+    def exec_command(self, cmd, tmp_path, sudo_user, sudoable=False, executable='/bin/sh', pty=False):
         ''' run a command on the local host '''
 
         if not self.runner.sudo or not sudoable:
