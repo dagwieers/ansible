@@ -67,7 +67,7 @@ class Connection(object):
 
         return self
 
-    def exec_command(self, cmd, tmp_path, sudo_user, sudoable=False, executable='/bin/sh'):
+    def exec_command(self, cmd, tmp_path, sudo_user, sudoable=False, executable='/bin/sh', pty=False):
         ''' run a command on the remote host '''
 
         vvv("EXEC COMMAND %s" % cmd)

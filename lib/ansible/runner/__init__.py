@@ -438,14 +438,14 @@ class Runner(object):
 
     # *****************************************************
 
-    def _low_level_exec_command(self, conn, cmd, tmp, sudoable=False, executable=None):
+    def _low_level_exec_command(self, conn, cmd, tmp, sudoable=False, executable=None, pty=False):
         ''' execute a command string over SSH, return the output '''
 
         if not executable:
             executable = '/bin/sh'
 
         sudo_user = self.sudo_user
-        rc, stdin, stdout, stderr = conn.exec_command(cmd, tmp, sudo_user, sudoable=sudoable, executable=executable)
+        rc, stdin, stdout, stderr = conn.exec_command(cmd, tmp, sudo_user, sudoable=sudoable, executable=executable, pty=pty)
 
         if type(stdout) not in [ str, unicode ]:
             out = ''.join(stdout.readlines())
