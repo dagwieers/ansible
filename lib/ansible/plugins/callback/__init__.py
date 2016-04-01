@@ -95,11 +95,11 @@ class CallbackBase:
         # All result keys stating with _ansible_ are internal, so remove them from the result before we output anything.
         abridged_result = strip_internal_keys(result)
 
-        # remove invocation unless specifically wanting it
+        # Remove invocation unless specifically wanting it
         if not keep_invocation and self._display.verbosity < 3 and 'invocation' in result:
             del abridged_result['invocation']
 
-        # remove diff information from screen output
+        # Remove diff information from screen output
         if self._display.verbosity < 3 and 'diff' in result:
             del abridged_result['diff']
 
