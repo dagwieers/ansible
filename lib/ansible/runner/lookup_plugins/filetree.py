@@ -127,7 +127,7 @@ class LookupModule(object):
                     # Skip if relpath was already processed (from another root)
                     if relpath not in [ entry['path'] for entry in ret ]:
                         props = file_props(path, relpath)
-                        if props != None:
+                        if props is not None:
                             ret.append(props)
 
         return ret
