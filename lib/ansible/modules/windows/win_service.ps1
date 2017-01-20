@@ -19,87 +19,75 @@
 # WANT_JSON
 # POWERSHELL_COMMON
 
-$params = Parse-Args $args;
+$ErrorActionPreference = "Stop"
 
-$result = New-Object PSObject;
-Set-Attr $result "changed" $false;
+$params = Parse-Args $args -supports_check_mode $true
 
-$name = Get-Attr $params "name" -failifempty $true
-$state = Get-Attr $params "state" $false
-$startMode = Get-Attr $params "start_mode" $false
+$check_mode = Get-AnsibleParam -obj $params "_ansible_check_mode" -type "bool" -default $false
 
-If ($state) {
-    $state = $state.ToString().ToLower()
-    If (($state -ne 'started') -and ($state -ne 'stopped') -and ($state -ne 'restarted')) {
-        Fail-Json $result "state is '$state'; must be 'started', 'stopped', or 'restarted'"
-    }
+$name = Get-AnsibleParam -obj $params -name "name" -type "str" -failifempty $true
+$state = Get-AnsibleParam -obj $params -name "state" -type "str" -default "started" -validateset "started","stopped","restarted"
+$start_mode = Get-AnsibleParam -obj $params -name "start_mode" -type "str" -validateset "auto","manual","disabled"
+$force = Get-AnsibleParam -obj $params -name "force" -type "bool" -default $false
+
+$result = @{
+    changed = $false
 }
 
-If ($startMode) {
-    $startMode = $startMode.ToString().ToLower()
-    If (($startMode -ne 'auto') -and ($startMode -ne 'manual') -and ($startMode -ne 'disabled')) {
-        Fail-Json $result "start mode is '$startMode'; must be 'auto', 'manual', or 'disabled'"
-    }
+$service = Get-Service -Name $name -ErrorAction SilentlyContinue
+if (-not $service) {
+    Fail-Json $result "Service '$name' not installed"
 }
 
-$svcName = $name
-$svc = Get-Service -Name $svcName -ErrorAction SilentlyContinue
-If (-not $svc) {
-    Fail-Json $result "Service '$svcName' not installed"
-}
+$result.name = $service.ServiceName
+$result.display_name = $service.DisplayName
+$result.state = $svc.Status.ToString().ToLower()
+
 # Use service name instead of display name for remaining actions.
-If ($svcName -ne $svc.ServiceName) {
-    $svcName = $svc.ServiceName
+if ($name -ne $service.ServiceName) {
+    Add-Warning("Please use `"$service.ServiceName`" as service name instead of `"$name`"")
+    $name = $service.ServiceName
 }
 
-Set-Attr $result "name" $svc.ServiceName
-Set-Attr $result "display_name" $svc.DisplayName
-
-$svcMode = Get-WmiObject -Class Win32_Service -Property StartMode -Filter "Name='$svcName'"
-If ($startMode) {
-    If ($svcMode.StartMode.ToLower() -ne $startMode) {
-        Set-Service -Name $svcName -StartupType $startMode
-        Set-Attr $result "changed" $true
-        Set-Attr $result "start_mode" $startMode
-    }
-    Else {
-        Set-Attr $result "start_mode" $svcMode.StartMode.ToLower()
+$current_mode = Get-WmiObject -Class Win32_Service -Property StartMode -Filter "Name='$name'"
+$result.start_mode = $current_mode.StartMode.ToLower()
+if ($start_mode -ne $null) {
+    if ($start_mode -ne $result.start_mode) {
+        Set-Service -Name $name -StartupType $start_mode -WhatIf:$check_mode
+        $result.changed = $true
+        $result.start_mode = $start_mode
     }
 }
-Else {
-    Set-Attr $result "start_mode" $svcMode.StartMode.ToLower()
-}
 
-If ($state) {
-    If ($state -eq "started" -and $svc.Status -ne "Running") {
-        try {
-            Start-Service -Name $svcName -ErrorAction Stop
-        }
-        catch {
-            Fail-Json $result $_.Exception.Message
-        }
-        Set-Attr $result "changed" $true;
-    }
-    ElseIf ($state -eq "stopped" -and $svc.Status -ne "Stopped") {
-        try {
-            Stop-Service -Name $svcName -ErrorAction Stop
-        }
-        catch {
-            Fail-Json $result $_.Exception.Message
-        }
-        Set-Attr $result "changed" $true;
-    }
-    ElseIf ($state -eq "restarted") {
-        try {
-            Restart-Service -Name $svcName -ErrorAction Stop
-        }
-        catch {
-            Fail-Json $result $_.Exception.Message
-        }
-        Set-Attr $result "changed" $true;
-    }
-}
-$svc.Refresh()
-Set-Attr $result "state" $svc.Status.ToString().ToLower()
+if ($state -eq "started" -and $service.Status -ne "Running") {
 
-Exit-Json $result;
+    try {
+        Start-Service -Name $name -WhatIf:$check_mode
+    } catch {
+        Fail-Json $result $_.Exception.Message
+    }
+    $result.changed = $true
+
+} elseif ($state -eq "stopped" -and $service.Status -ne "Stopped") {
+
+    try {
+        Stop-Service -Name $name -Force:$force -WhatIf:$check_mode
+    } catch {
+        Fail-Json $result $_.Exception.Message
+    }
+    $result.changed = $true
+
+} elseif ($state -eq "restarted") {
+
+    try {
+        Restart-Service -Name $name -Force:$force -WhatIf:$check_mode
+    } catch {
+        Fail-Json $result $_.Exception.Message
+    }
+    $result.changed = $true
+
+}
+$service.Refresh()
+$result.state = $service.Status.ToString().ToLower()
+
+Exit-Json $result
