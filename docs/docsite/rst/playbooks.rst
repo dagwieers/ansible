@@ -5,7 +5,7 @@ Playbooks are Ansible's configuration, deployment, and orchestration language.  
 
 If Ansible modules are the tools in your workshop, playbooks are your instruction manuals, and your inventory of hosts are your raw material.
 
-At a basic level, playbooks can be used to manage configurations of and deployments to remote machines.  At a more advanced level, they can sequence multi-tier rollouts involving rolling updates, and can delegate actions to other hosts, interacting with monitoring servers and load balancers along the way.  
+At a basic level, playbooks can be used to manage configurations of and deployments to remote machines.  At a more advanced level, they can sequence multi-tier rollouts involving rolling updates, and can delegate acpokjpojojĵoijigftions to other hosts, interacting with monitoring servers and load balancers along the way.  
 
 While there's a lot of information here, there's no need to learn everything at once.  You can start small and pick up more features
 over time as you need them.  
