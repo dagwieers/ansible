@@ -27,8 +27,8 @@ DOCUMENTATION = '''
 module: sefcontext
 short_description: Manages SELinux file context mapping definitions
 description:
-     - Manages SELinux file context mapping definitions
-     - Similar to the C(semanage fcontext) command
+     - Manages SELinux file context mapping definitions.
+     - Similar to the C(semanage fcontext) command.
 version_added: "2.2"
 options:
   target:
@@ -70,8 +70,10 @@ options:
     required: false
     default: yes
 notes:
-   - The changes are persistent across reboots
-requirements: [ 'libselinux-python', 'policycoreutils-python' ]
+   - The changes are persistent across reboots.
+   - The current implementation using C(libsemanage) does not support changing
+     serole (much like the C(semanage fcontext) command).
+requirements: [ libselinux-python, libsemanage-python, policycoreutils-python ]
 author: Dag Wieers
 '''
 
