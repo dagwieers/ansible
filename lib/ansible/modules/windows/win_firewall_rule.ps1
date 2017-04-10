@@ -114,7 +114,7 @@ function getFirewallRule ($fwsettings) {
                             Continue
                         } else {
                             $diff=$true;
-                            $difference+=@("$($fwsetting.Key): $($output.$($fwsetting.Key)) vs $($fwsettings.$($fwsetting.Key))");
+                            $difference+=@("'$($fwsetting.Key.ToLower())': '$($output.$($fwsetting.Key).ToLower())' vs '$($fwsettings.$($fwsetting.Key))'")
                         };
                     };
                 };
@@ -157,6 +157,10 @@ function createFireWallRule ($fwsettings) {
             $key='dir'
         } elseif ($fwsetting.key -eq 'Rule Name') {
             $key='name'
+        } elseif ($fwsetting.key -eq 'Enabled') {
+            $key='enable'
+        } elseif ($fwsetting.key -eq 'Profiles') {
+            $key='profile'
         } else {
             $key=$($fwsetting.key).ToLower()
         };
