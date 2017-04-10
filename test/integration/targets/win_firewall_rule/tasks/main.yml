@@ -103,7 +103,7 @@
     that:
     - add_different_firewall_rule_without_force.failed == true
     - add_different_firewall_rule_without_force.changed == false
-    - add_different_firewall_rule_without_force.difference == ["block"]
+    - add_different_firewall_rule_without_force.difference == ["'action'{{':'}} 'allow' vs 'block'"]
 
 - name: Add different firewall rule with force setting
   win_firewall_rule:
@@ -122,7 +122,7 @@
     that:
     - add_different_firewall_rule_with_force.failed == false
     - add_different_firewall_rule_with_force.changed == true
-    - add_different_firewall_rule_with_force.difference == ["block"]
+    - add_different_firewall_rule_with_force.difference == ["'action'{{':'}} 'allow' vs 'block'"]
 
 - name: Add firewall rule when remoteip is range
   win_firewall_rule:
