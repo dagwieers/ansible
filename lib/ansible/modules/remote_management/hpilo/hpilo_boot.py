@@ -77,9 +77,9 @@ options:
     choices: [ "yes", "no" ]
   ssl_version:
     description:
-      - Change the ssl_version used.
+    - Change the ssl_version used.
     default: TLSv1
-    choices: [ "SSLv3", "SSLv23", "TLSv1", "TLSv1_1", "TLSv1_2" ]
+    choices: [ SSLv23, SSLv3, TLSv1, TLSv1_1, TLSv1_2 ]
     version_added: '2.4'
 requirements:
 - hpilo
@@ -140,7 +140,7 @@ def main():
             image = dict(default=None, type='str'),
             state = dict(default='boot_once', type='str', choices=['boot_always', 'boot_once', 'connect', 'disconnect', 'no_boot', 'poweroff']),
             force = dict(default=False, type='bool'),
-            ssl_version = dict(default='TLSv1', choices=['SSLv3', 'SSLv23', 'TLSv1', 'TLSv1_1', 'TLSv1_2']),
+            ssl_version = dict(default='TLSv1', choices=['SSLv23', 'SSLv3', 'TLSv1', 'TLSv1_1', 'TLSv1_2']),
         )
     )
 
@@ -154,7 +154,13 @@ def main():
     image = module.params['image']
     state = module.params['state']
     force = module.params['force']
-    ssl_version = getattr(hpilo.ssl, 'PROTOCOL_' + module.params.get('ssl_version').upper().replace('V','v'))
+    
+    # Try the requested protocol, fall back to library's default
+    ssl_protocol = 'PROTOCOL_' + module.params['ssl_version'].upper().replace('V','v')
+    if (hasattr(hpilo.ssl, ssl_protocol):
+        ssl_version = getattr(hpilo.ssl, ssl_protocol)
+    else:
+        ssl_version = None
 
     ilo = hpilo.Ilo(host, login=login, password=password, ssl_version=ssl_version)
     changed = False
