@@ -49,9 +49,9 @@ options:
     default: admin
   ssl_version:
     description:
-      - Change the ssl_version used.
+    - Change the ssl_version used.
     default: TLSv1
-    choices: [ "SSLv3", "SSLv23", "TLSv1", "TLSv1_1", "TLSv1_2" ]
+    choices: [ SSLv23, SSLv3, TLSv1, TLSv1_1, TLSv1_2 ]
 requirements:
 - hpilo
 notes:
@@ -163,7 +163,7 @@ def main():
             host = dict(required=True, type='str'),
             login = dict(default='Administrator', type='str'),
             password = dict(default='admin', type='str', no_log=True),
-            ssl_version = dict(default='TLSv1', choices=['SSLv3','SSLv23','TLSv1','TLSv1_1','TLSv1_2']),
+            ssl_version = dict(default='TLSv1', choices=[ 'SSLv23', 'SSLv3','TLSv1','TLSv1_1','TLSv1_2']),
         ),
         supports_check_mode=True,
     )
@@ -174,7 +174,13 @@ def main():
     host = module.params['host']
     login = module.params['login']
     password = module.params['password']
-    ssl_version = getattr(hpilo.ssl, 'PROTOCOL_' + module.params.get('ssl_version').upper().replace('V','v'))
+
+    # Try the requested protocol, fall back to library's default
+    ssl_protocol = 'PROTOCOL_' + module.params['ssl_version'].upper().replace('V','v')
+    if (hasattr(hpilo.ssl, ssl_protocol):
+        ssl_version = getattr(hpilo.ssl, ssl_protocol)
+    else:
+        ssl_version = None
 
     ilo = hpilo.Ilo(host, login=login, password=password, ssl_version=ssl_version)
 
