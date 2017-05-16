@@ -859,7 +859,6 @@ lib/ansible/plugins/test/core.py
 lib/ansible/plugins/test/files.py
 lib/ansible/plugins/test/mathstuff.py
 lib/ansible/plugins/vars/__init__.py
-lib/ansible/release.py
 lib/ansible/utils/cmd_functions.py
 lib/ansible/utils/color.py
 lib/ansible/utils/display.py
