@@ -47,6 +47,7 @@ This one is a little at risk due to staffing. We're investigating some community
 Azure
 -----
 This is on hold until Microsoft swaps out the code generator on the Azure Python SDK, which may introduce breaking changes. We have basic modules working against all of these resources at this time. Could ship it against current SDK, but may break. Or should the version be pinned?)
+
 - Minimal Azure coverage using new ARM api
 - Resource Group
 - Virtual Network
@@ -57,7 +58,6 @@ This is on hold until Microsoft swaps out the code generator on the Azure Python
 - Security Group
 - Virtual Machine
 - Update of inventory script to use new API, adding tagging support
-
 
 Docker
 ------

@@ -143,11 +143,13 @@ that we don’t expect this to be complete by the 2.2 release.  Toshio will
 lead this overall effort.
 
 - Motivation:
+
   - Ubuntu LTS (16.04) already ships without python2.  RHEL8 is coming which is also expected to be python3 based.  These considerations make this high priority.
   - Ansible users are getting restless: https://groups.google.com/forum/#!topic/ansible-project/DUKzTho3OCI
   - This is probably going to take multiple releases to complete; need to get started now
 
 - Baselines:
+
   - We're targeting Python-3.5 and above.
 
 - Goals for 2.2:
@@ -179,13 +181,13 @@ lead this overall effort.
       - A handful of modules like stat have been line-by-line ported.  They should work reliably with few python3-specific bugs.  All but three integration tests pass which means that most essential modules are working to some extent on Python3.
 
         - The three failing tests are: service, hg, and uri.
-        - Note, large swaths of the modules are not tested.  The status of
-           these is unknown
+        - Note, large swaths of the modules are not tested.  The status of these is unknown
 
   - All code should compile under Python3.
     - lib/ansible/* and all modules now compile under Python-3.5
 
   - Side work to do:
+
     - Figure out best ways to run unit-tests on modules.  Start unit-testing modules.  This is going to become important so we don’t regress python3 or python2.4 support in modules  (Going to largely punt on this for 2.2.  Matt Clay is working on building us a testing foundation for the first half of 2.2 development so we’ll re-evaluate towards the middle of the dev cycle).
     - More unit tests of module_utils
     - More integration tests.  Currently integration tests are the best way to test ansible modules so we have to rely on those.
