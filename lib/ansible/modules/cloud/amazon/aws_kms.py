@@ -1,86 +1,81 @@
 #!/usr/bin/python
-# This file is part of Ansible
-#
-# Ansible is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# Ansible is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with Ansible.  If not, see <http://www.gnu.org/licenses/>.
+# -*- coding: utf-8 -*-
+
+# Copyright: (c) 2017, Ansible Project
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+
+from __future__ import absolute_import, division, print_function
+__metaclass__ = type
 
 ANSIBLE_METADATA = {'metadata_version': '1.1',
                     'status': ['preview'],
                     'supported_by': 'certified'}
 
-
 DOCUMENTATION = '''
 ---
 module: aws_kms
-short_description: Perform various KMS management tasks.
+short_description: Perform various KMS management tasks
 description:
      - Manage role/user access to a KMS key. Not designed for encrypting/decrypting.
 version_added: "2.3"
-requirements: [ boto3 ]
+requirements:
+- boto3
 options:
   mode:
     description:
     - Grant or deny access.
-    required: true
+    required: yes
+    choices: [ deny, grant ]
     default: grant
-    choices: [ grant, deny ]
   key_alias:
     description:
-    - Alias label to the key. One of C(key_alias) or C(key_arn) are required.
-    required: false
+    - Alias label to the key.
+    - One of C(key_alias) or C(key_arn) are required.
   key_arn:
     description:
-    - Full ARN to the key. One of C(key_alias) or C(key_arn) are required.
-    required: false
+    - Full ARN to the key.
+    - One of C(key_alias) or C(key_arn) are required.
   role_name:
     description:
-    - Role to allow/deny access. One of C(role_name) or C(role_arn) are required.
-    required: false
+    - Role to allow/deny access.
+    - One of C(role_name) or C(role_arn) are required.
   role_arn:
     description:
-    - ARN of role to allow/deny access. One of C(role_name) or C(role_arn) are required.
-    required: false
+    - ARN of role to allow/deny access.
+    - One of C(role_name) or C(role_arn) are required.
   grant_types:
     description:
-    - List of grants to give to user/role. Likely "role,role grant" or "role,role grant,admin". Required when C(mode=grant).
-    required: false
+    - List of grants to give to user/role. Likely "role,role grant" or "role,role grant,admin".
+    - Required when C(mode=grant).
   clean_invalid_entries:
     description:
-    - If adding/removing a role and invalid grantees are found, remove them. These entries will cause an update to fail in all known cases.
+    - If adding/removing a role and invalid grantees are found, remove them.
+    - These entries will cause an update to fail in all known cases.
     - Only cleans if changes are being made.
     type: bool
-    default: true
-
-author: tedder
+    default: 'yes'
+author:
+- tedder
 extends_documentation_fragment:
 - aws
 - ec2
 '''
 
 EXAMPLES = '''
-- name: grant user-style access to production secrets
+- name: Grant user-style access to production secrets
   kms:
   args:
     mode: grant
-    key_alias: "alias/my_production_secrets"
-    role_name: "prod-appServerRole-1R5AQG2BSEL6L"
-    grant_types: "role,role grant"
-- name: remove access to production secrets from role
+    key_alias: alias/my_production_secrets
+    role_name: prod-appServerRole-1R5AQG2BSEL6L
+    grant_types: role,role grant
+
+- name: Remove access to production secrets from role
   kms:
   args:
     mode: deny
-    key_alias: "alias/my_production_secrets"
-    role_name: "prod-appServerRole-1R5AQG2BSEL6L"
+    key_alias: alias/my_production_secrets
+    role_name: prod-appServerRole-1R5AQG2BSEL6L
 '''
 
 RETURN = '''
@@ -120,13 +115,14 @@ try:
 except ImportError:
     HAS_BOTO3 = False
 
+
 def get_arn_from_kms_alias(kms, aliasname):
     ret = kms.list_aliases()
     key_id = None
     for a in ret['Aliases']:
         if a['AliasName'] == aliasname:
-            key_id = a['TargetKeyId']
-            break
+                key_id = a['TargetKeyId']
+                break
     if not key_id:
         raise Exception('could not find alias {}'.format(aliasname))
 
@@ -138,11 +134,13 @@ def get_arn_from_kms_alias(kms, aliasname):
             return k['KeyArn']
     raise Exception('could not find key from id: {}'.format(key_id))
 
+
 def get_arn_from_role_name(iam, rolename):
     ret = iam.get_role(RoleName=rolename)
     if ret.get('Role') and ret['Role'].get('Arn'):
         return ret['Role']['Arn']
     raise Exception('could not find arn for name {}.'.format(rolename))
+
 
 def do_grant(kms, keyarn, role_arn, granttypes, mode='grant', dry_run=True, clean_invalid_entries=True):
     ret = {}
@@ -179,10 +177,10 @@ def do_grant(kms, keyarn, role_arn, granttypes, mode='grant', dry_run=True, clea
                         statement['Principal']['AWS'] = valid_entries
                         had_invalid_entries = True
 
-                    if not role_arn in statement['Principal']['AWS']: # needs to be added.
+                    if role_arn not in statement['Principal']['AWS']:  # needs to be added.
                         changes_needed[granttype] = 'add'
                         statement['Principal']['AWS'].append(role_arn)
-                elif role_arn in statement['Principal']['AWS']: # not one the places the role should be
+                elif role_arn in statement['Principal']['AWS']:  # not one the places the role should be
                     changes_needed[granttype] = 'remove'
                     statement['Principal']['AWS'].remove(role_arn)
 
@@ -210,6 +208,7 @@ def do_grant(kms, keyarn, role_arn, granttypes, mode='grant', dry_run=True, clea
 
     return ret
 
+
 def assert_policy_shape(policy):
     '''Since the policy seems a little, uh, fragile, make sure we know approximately what we're looking at.'''
     errors = []
@@ -218,7 +217,7 @@ def assert_policy_shape(policy):
 
     found_statement_type = {}
     for statement in policy['Statement']:
-        for label,sidlabel in statement_label.items():
+        for label, sidlabel in statement_label.items():
             if statement['Sid'] == sidlabel:
                 found_statement_type[label] = True
 
@@ -230,18 +229,18 @@ def assert_policy_shape(policy):
         raise Exception('Problems asserting policy shape. Cowardly refusing to modify it: {}'.format(' '.join(errors)))
     return None
 
+
 def main():
     argument_spec = ansible.module_utils.ec2.ec2_argument_spec()
     argument_spec.update(dict(
-        mode = dict(choices=['grant', 'deny'], default='grant'),
-        key_alias = dict(required=False, type='str'),
-        key_arn = dict(required=False, type='str'),
-        role_name = dict(required=False, type='str'),
-        role_arn = dict(required=False, type='str'),
-        grant_types = dict(required=False, type='list'),
-        clean_invalid_entries = dict(type='bool', default=True),
-    )
-    )
+        mode=dict(type='str', default='grant', choices=['grant', 'deny']),
+        key_alias=dict(type='str'),
+        key_arn=dict(type='str'),
+        role_name=dict(type='str'),
+        role_arn=dict(type='str'),
+        grant_types=dict(type='list'),
+        clean_invalid_entries=dict(type='bool', default=True),
+    ))
 
     module = AnsibleModule(
         supports_check_mode=True,
@@ -254,15 +253,12 @@ def main():
 
     result = {}
     mode = module.params['mode']
-
-
     try:
         region, ec2_url, aws_connect_kwargs = ansible.module_utils.ec2.get_aws_connection_info(module, boto3=True)
         kms = ansible.module_utils.ec2.boto3_conn(module, conn_type='client', resource='kms', region=region, endpoint=ec2_url, **aws_connect_kwargs)
         iam = ansible.module_utils.ec2.boto3_conn(module, conn_type='client', resource='iam', region=region, endpoint=ec2_url, **aws_connect_kwargs)
     except botocore.exceptions.NoCredentialsError as e:
         module.fail_json(msg='cannot connect to AWS', exception=traceback.format_exc())
-
 
     try:
         if module.params['key_alias'] and not module.params['key_arn']:
@@ -278,13 +274,13 @@ def main():
         # check the grant types for 'grant' only.
         if mode == 'grant':
             for g in module.params['grant_types']:
-                if not g in statement_label:
+                if g not in statement_label:
                     module.fail_json(msg='{} is an unknown grant type.'.format(g))
 
         ret = do_grant(kms, module.params['key_arn'], module.params['role_arn'], module.params['grant_types'],
-                  mode=mode,
-                  dry_run=module.check_mode,
-                  clean_invalid_entries=module.params['clean_invalid_entries'])
+                       mode=mode,
+                       dry_run=module.check_mode,
+                       clean_invalid_entries=module.params['clean_invalid_entries'])
         result.update(ret)
 
     except Exception as err:
