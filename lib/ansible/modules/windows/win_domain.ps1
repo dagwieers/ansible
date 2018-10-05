@@ -29,6 +29,9 @@ $domain_netbios_name = Get-AnsibleParam -obj $params -name "domain_netbios_name"
 $safe_mode_admin_password = Get-AnsibleParam -obj $params -name "safe_mode_password" -failifempty $true
 $database_path = Get-AnsibleParam -obj $params -name "database_path" -type "path"
 $sysvol_path = Get-AnsibleParam -obj $params -name "sysvol_path" -type "path"
+$create_dns_delegation = Get-AnsibleParam -obj $params -name "create_dns_delegation" -type "bool" -default $true
+$domain_mode = Get-AnsibleParam -obj $params -name "domain_mode" -type "str" -choices "Win2003","Win2008","Win2008R2","Win2012","Win2012R2","WinTreshold"
+$forest_mode = Get-AnsibleParam -obj $params -name "forest_mode" -type "str" -choices "Win2003","Win2008","Win2008R2","Win2012","Win2012R2","WinTreshold"
 
 $forest = $null
 
@@ -71,7 +74,16 @@ If(-not $forest) {
         if ($domain_netbios_name) {
             $install_forest_args.DomainNetBiosName = $domain_netbios_name
         }
-        
+        if ($create_dns_delegation -ne $null) {
+            $install_params.CreateDnsDelegation = $create_dns_delegation
+        }
+        if ($domain_mode) {
+            $install_params.DomainMode = $domain_mode
+        }
+        if ($forest_mode) {
+            $install_params.ForestMode = $forest_mode
+        }
+
         $iaf = Install-ADDSForest @install_forest_args
 
         $result.reboot_required = $iaf.RebootRequired
