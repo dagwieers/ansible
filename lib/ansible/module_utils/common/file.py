@@ -45,7 +45,7 @@ def is_executable(path):
     return ((stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH) & os.stat(path)[stat.ST_MODE])
 
 
-class FileLock():
+class FileLock:
     '''
     Currently FileLock is implemented via fcntl.flock on a lock file, however this
     behaviour may change in the future. Avoid mixing lock types fcntl.flock,
