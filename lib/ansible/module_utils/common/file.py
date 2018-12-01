@@ -5,20 +5,20 @@ from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 
 import errno
-import os
-import stat
-import re
-import pwd
-import grp
-import time
-import shutil
-import traceback
 import fcntl
+import grp
+import os
+import pwd
+import re
+import shutil
+import stat
 import sys
+import time
+import traceback
 
-from contextlib import contextmanager
-from ansible.module_utils._text import to_bytes, to_native, to_text
 from ansible.module_utils.six import b, binary_type
+from ansible.module_utils._text import to_bytes, to_native, to_text
+from contextlib import contextmanager
 
 try:
     import selinux
@@ -79,27 +79,27 @@ class FileLock:
             Default is None, wait indefinitely until lock is released.
         :returns: True
         '''
-        lock_path_b = to_bytes(path, errors='surrogate_or_strict')
+        lock_path = to_native(path, errors='surrogate_or_strict')
         l_wait = 0.1
         r_exception = IOError
         if sys.version_info[0] == 3:
             r_exception = BlockingIOError
 
-        self.lockfd = open(lock_path_b, 'ab')
+        self.lockfd = open(lock_path, 'ab')
 
         if lock_timeout is None or lock_timeout < 0:
-            fcntl.flock(self.lockfd, fcntl.LOCK_EX)
+            fcntl.lockf(self.lockfd, fcntl.LOCK_EX)
             return True
 
         if lock_timeout == 0:
-            fcntl.flock(self.lockfd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.lockf(self.lockfd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             return True
 
         if lock_timeout > 0:
             e_secs = 0
             while e_secs < lock_timeout:
                 try:
-                    fcntl.flock(self.lockfd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    fcntl.lockf(self.lockfd, fcntl.LOCK_EX | fcntl.LOCK_NB)
                     return True
                 except r_exception:
                     time.sleep(l_wait)
