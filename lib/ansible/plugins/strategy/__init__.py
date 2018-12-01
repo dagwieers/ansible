@@ -47,15 +47,11 @@ from ansible.playbook.task_include import TaskInclude
 from ansible.playbook.role_include import IncludeRole
 from ansible.plugins.loader import action_loader, connection_loader, filter_loader, lookup_loader, module_loader, test_loader
 from ansible.template import Templar
+from ansible.utils.display import Display
 from ansible.utils.vars import combine_vars
 from ansible.vars.clean import strip_internal_keys
 
-
-try:
-    from __main__ import display
-except ImportError:
-    from ansible.utils.display import Display
-    display = Display()
+display = Display()
 
 __all__ = ['StrategyBase']
 
@@ -317,6 +313,7 @@ class StrategyBase:
 
                     worker_prc = WorkerProcess(self._final_q, task_vars, host, task, play_context, self._loader, self._variable_manager, shared_loader_obj)
                     self._workers[self._cur_worker] = worker_prc
+                    self._tqm.send_callback('v2_runner_on_start', host, task)
                     worker_prc.start()
                     display.debug("worker is %d (out of %d available)" % (self._cur_worker + 1, len(self._workers)))
                     queued = True
@@ -371,7 +368,8 @@ class StrategyBase:
                 return self._inventory.get_host(host_name)
 
         def search_handler_blocks_by_name(handler_name, handler_blocks):
-            for handler_block in handler_blocks:
+            # iterate in reversed order since last handler loaded with the same name wins
+            for handler_block in reversed(handler_blocks):
                 for handler_task in handler_block.block:
                     if handler_task.name:
                         handler_vars = self._variable_manager.get_vars(play=iterator._play, task=handler_task)
@@ -397,7 +395,8 @@ class StrategyBase:
             return None
 
         def search_handler_blocks_by_uuid(handler_uuid, handler_blocks):
-            for handler_block in handler_blocks:
+            # iterate in reversed order since last handler loaded with the same name wins
+            for handler_block in reversed(handler_blocks):
                 for handler_task in handler_block.block:
                     if handler_uuid == handler_task._uuid:
                         return handler_task
@@ -405,7 +404,7 @@ class StrategyBase:
 
         def parent_handler_match(target_handler, handler_name):
             if target_handler:
-                if isinstance(target_handler, (TaskInclude, IncludeRole)):
+                if isinstance(target_handler, (TaskInclude, IncludeRole)) and not getattr(target_handler, 'statically_loaded', True):
                     try:
                         handler_vars = self._variable_manager.get_vars(play=iterator._play, task=target_handler)
                         templar = Templar(loader=self._loader, variables=handler_vars)
@@ -952,9 +951,12 @@ class StrategyBase:
                         iterator._play.handlers.append(block)
                         iterator.cache_block_tasks(block)
                         for task in block.block:
+                            task_name = task.get_name()
+                            display.debug("adding task '%s' included in handler '%s'" % (task_name, handler_name))
+                            self._notified_handlers[task._uuid] = included_file._hosts[:]
                             result = self._do_handler_run(
                                 handler=task,
-                                handler_name=task.get_name(),
+                                handler_name=task_name,
                                 iterator=iterator,
                                 play_context=play_context,
                                 notified_hosts=included_file._hosts[:],
@@ -965,7 +967,7 @@ class StrategyBase:
                     for host in included_file._hosts:
                         iterator.mark_host_failed(host)
                         self._tqm._failed_hosts[host.name] = True
-                    display.warning(str(e))
+                    display.warning(to_text(e))
                     continue
 
         # remove hosts from notification list
@@ -1063,6 +1065,13 @@ class StrategyBase:
                     if host.name not in self._tqm._unreachable_hosts:
                         iterator._host_states[host.name].run_state = iterator.ITERATING_COMPLETE
                 msg = "ending play"
+        elif meta_action == 'end_host':
+            if _evaluate_conditional(target_host):
+                iterator._host_states[target_host.name].run_state = iterator.ITERATING_COMPLETE
+                msg = "ending play for %s" % target_host.name
+            else:
+                skipped = True
+                msg = "end_host conditional evaluated to false, continuing execution for %s" % target_host.name
         elif meta_action == 'reset_connection':
             all_vars = self._variable_manager.get_vars(play=iterator._play, host=target_host, task=task)
             templar = Templar(loader=self._loader, variables=all_vars)
@@ -1196,6 +1205,16 @@ class Debugger(cmd.Cmd):
         return True
 
     do_r = do_redo
+
+    def do_update_task(self, args):
+        """Recreate the task from ``task._ds``, and template with updated ``task_vars``"""
+        templar = Templar(None, shared_loader_obj=None, variables=self.scope['task_vars'])
+        task = self.scope['task']
+        task = task.load_data(task._ds)
+        task.post_validate(templar)
+        self.scope['task'] = task
+
+    do_u = do_update_task
 
     def evaluate(self, args):
         try:

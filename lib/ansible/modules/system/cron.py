@@ -128,8 +128,8 @@ requirements:
   - cron
 author:
     - Dane Summers (@dsummersl)
-    - Mike Grozak
-    - Patrick Callahan
+    - Mike Grozak (@rhaido)
+    - Patrick Callahan (@dirtyharrycallahan)
     - Evan Kaufman (@EvanK)
     - Luca Berruti (@lberruti)
 """
@@ -698,7 +698,7 @@ def main():
                 changed = True
 
     # no changes to env/job, but existing crontab needs a terminating newline
-    if not changed and not crontab.existing == '':
+    if not changed and crontab.existing != '':
         if not (crontab.existing.endswith('\r') or crontab.existing.endswith('\n')):
             changed = True
 

@@ -59,8 +59,8 @@ class ModuleFailException(Exception):
         self.msg = msg
         self.module_fail_args = args
 
-    def do_fail(self, module):
-        module.fail_json(msg=self.msg, other=self.module_fail_args)
+    def do_fail(self, module, **arguments):
+        module.fail_json(msg=self.msg, other=self.module_fail_args, **arguments)
 
 
 def nopad_b64(data):
@@ -437,7 +437,7 @@ class ACMEDirectory(object):
         self.directory_root = module.params['acme_directory']
         self.version = module.params['acme_version']
 
-        self.directory, dummy = account.get_request(self.directory_root)
+        self.directory, dummy = account.get_request(self.directory_root, get_only=True)
 
         # Check whether self.version matches what we expect
         if self.version == 1:
@@ -518,9 +518,16 @@ class ACMEAccount(object):
         else:
             return _parse_key_openssl(self._openssl_bin, self.module, key_file, key_content)
 
-    def sign_request(self, protected, payload, key_data):
+    def sign_request(self, protected, payload, key_data, encode_payload=True):
         try:
-            payload64 = nopad_b64(self.module.jsonify(payload).encode('utf8'))
+            if payload is None:
+                # POST-as-GET
+                payload64 = ''
+            else:
+                # POST
+                if encode_payload:
+                    payload = self.module.jsonify(payload).encode('utf8')
+                payload64 = nopad_b64(to_bytes(payload))
             protected64 = nopad_b64(self.module.jsonify(protected).encode('utf8'))
         except Exception as e:
             raise ModuleFailException("Failed to encode payload / headers as JSON: {0}".format(e))
@@ -530,11 +537,14 @@ class ACMEAccount(object):
         else:
             return _sign_request_openssl(self._openssl_bin, self.module, payload64, protected64, key_data)
 
-    def send_signed_request(self, url, payload, key_data=None, jws_header=None, parse_json_result=True):
+    def send_signed_request(self, url, payload, key_data=None, jws_header=None, parse_json_result=True, encode_payload=True):
         '''
         Sends a JWS signed HTTP POST request to the ACME server and returns
         the response as dictionary
         https://tools.ietf.org/html/draft-ietf-acme-acme-14#section-6.2
+
+        If payload is None, a POST-as-GET is performed.
+        (https://tools.ietf.org/html/draft-ietf-acme-acme-15#section-6.3)
         '''
         key_data = key_data or self.key_data
         jws_header = jws_header or self.jws_header
@@ -545,7 +555,7 @@ class ACMEAccount(object):
             if self.version != 1:
                 protected["url"] = url
 
-            data = self.sign_request(protected, payload, key_data)
+            data = self.sign_request(protected, payload, key_data, encode_payload=encode_payload)
             if self.version == 1:
                 data["header"] = jws_header
             data = self.module.jsonify(data)
@@ -558,7 +568,7 @@ class ACMEAccount(object):
             try:
                 content = resp.read()
             except AttributeError:
-                content = info.get('body')
+                content = info.pop('body')
 
             if content or not parse_json_result:
                 if (parse_json_result and info['content-type'].startswith('application/json')) or 400 <= info['status'] < 600:
@@ -573,6 +583,8 @@ class ACMEAccount(object):
                             continue
                         if parse_json_result:
                             result = decoded_result
+                        else:
+                            result = content
                     except ValueError:
                         raise ModuleFailException("Failed to parse the ACME response: {0} {1}".format(url, content))
                 else:
@@ -580,14 +592,31 @@ class ACMEAccount(object):
 
             return result, info
 
-    def get_request(self, uri, parse_json_result=True, headers=None):
-        resp, info = fetch_url(self.module, uri, method='GET', headers=headers)
+    def get_request(self, uri, parse_json_result=True, headers=None, get_only=False, fail_on_error=True):
+        '''
+        Perform a GET-like request. Will try POST-as-GET for ACMEv2, with fallback
+        to GET if server replies with a status code of 405.
+        '''
+        if not get_only and self.version != 1:
+            # Try POST-as-GET
+            content, info = self.send_signed_request(uri, None, parse_json_result=False)
+            if info['status'] == 405:
+                # Instead, do unauthenticated GET
+                get_only = True
+        else:
+            # Do unauthenticated GET
+            get_only = True
 
-        try:
-            content = resp.read()
-        except AttributeError:
-            content = info.get('body')
+        if get_only:
+            # Perform unauthenticated GET
+            resp, info = fetch_url(self.module, uri, method='GET', headers=headers)
 
+            try:
+                content = resp.read()
+            except AttributeError:
+                content = info.pop('body')
+
+        # Process result
         if parse_json_result:
             result = {}
             if content:
@@ -601,7 +630,7 @@ class ACMEAccount(object):
         else:
             result = content
 
-        if info['status'] >= 400:
+        if fail_on_error and info['status'] >= 400:
             raise ModuleFailException("ACME request failed: CODE: {0} RESULT: {1}".format(info['status'], result))
         return result, info
 
@@ -668,10 +697,19 @@ class ACMEAccount(object):
         '''
         if self.uri is None:
             raise ModuleFailException("Account URI unknown")
-        data = {}
         if self.version == 1:
+            data = {}
             data['resource'] = 'reg'
-        result, info = self.send_signed_request(self.uri, data)
+            result, info = self.send_signed_request(self.uri, data)
+        else:
+            # try POST-as-GET first (draft-15 or newer)
+            data = None
+            result, info = self.send_signed_request(self.uri, data)
+            # check whether that failed with a malformed request error
+            if info['status'] >= 400 and result.get('type') == 'urn:ietf:params:acme:error:malformed':
+                # retry as a regular POST (with no changed data) for pre-draft-15 ACME servers
+                data = {}
+                result, info = self.send_signed_request(self.uri, data)
         if info['status'] in (400, 403) and result.get('type') == 'urn:ietf:params:acme:error:unauthorized':
             # Returned when account is deactivated
             return None
@@ -761,7 +799,7 @@ def cryptography_get_csr_domains(module, csr_filename):
     return domains
 
 
-def cryptography_get_cert_days(module, cert_file):
+def cryptography_get_cert_days(module, cert_file, now=None):
     '''
     Return the days the certificate in cert_file remains valid and -1
     if the file was not found. If cert_file contains more than one
@@ -774,7 +812,8 @@ def cryptography_get_cert_days(module, cert_file):
         cert = cryptography.x509.load_pem_x509_certificate(read_file(cert_file), _cryptography_backend)
     except Exception as e:
         raise ModuleFailException('Cannot parse certificate {0}: {1}'.format(cert_file, e))
-    now = datetime.datetime.now()
+    if now is None:
+        now = datetime.datetime.now()
     return (cert.not_valid_after - now).days
 
 
