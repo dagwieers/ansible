@@ -17,16 +17,28 @@ ANSIBLE_METADATA = {'metadata_version': '1.1',
 DOCUMENTATION = r'''
 ---
 module: pkgutil
-short_description: Manage CSW-Packages on Solaris
-description:
-- Manages CSW packages (SVR4 format) on Solaris 10 and 11.
-- These were the native packages on Solaris <= 10 and are available as a legacy feature in Solaris 11.
-- Pkgutil is an advanced packaging system, which resolves dependency on installation.
-  It is designed for CSW packages.
+short_description: Manage OpenCSW packages on Solaris
+description: >-
+  Install, update or remove Solaris SVR4 format packages provided by the
+  OpenCSW project.  Unlike Ansible's M(svr4pkg) module (which is also
+  able to work with these packages), this module handles package
+  dependencies and downloads so all required packages are installed
+  before the desired package automatically.
 version_added: '1.3'
 author:
 - Alexander Winkler (@dermute)
 - David Ponessa (@scathatheworm)
+seealso:
+- name: OpenCSW
+  link: https://www.opencsw.org/
+  description: This module is for managing packages produced by the OpenCSW project.
+- name: pkgutil
+  link: http://pkgutil.net/
+  description: The C(pkgutil) command-line tool that this module wraps.
+- module: svr4pkg
+  description: Manage native packages on Solaris 10 and earlier.
+- module: pkg5
+  description: Manage native packages on Solaris 11 and later.
 options:
   name:
     description:
